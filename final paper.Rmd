@@ -1,0 +1,1059 @@
+---
+title: "survey paper"
+author: "Michael Bales"
+output: word_document
+---
+
+```{r data clean, cache=FALSE, warning=FALSE, message=FALSE, echo=FALSE}
+library(knitr)
+opts_chunk$set(warning = FALSE, message = FALSE, echo = FALSE)
+
+## Set seed ##
+
+set.seed(543)
+
+## read in survey data ##
+mturksurveyspring2016 <- read.csv("mturksurveyspring2016.csv", stringsAsFactors = FALSE)
+
+## clean data ##
+
+mturksurveyspring2016[mturksurveyspring2016 == "" | mturksurveyspring2016 == "{}"] <- "Null"
+
+mturksurveyspring2016$X3.Age[mturksurveyspring2016$X3.Age == "Null" | mturksurveyspring2016$X3.Age == "US" | mturksurveyspring2016$X3.Age == "1982"] <- "99"
+
+is.na(mturksurveyspring2016$X3.Age) <- mturksurveyspring2016$X3.Age == "99"
+
+mturksurveyspring2016$X3.Age <- as.numeric(mturksurveyspring2016$X3.Age)
+
+## sample survey ##
+
+mysurveysamp <- mturksurveyspring2016[sample(nrow(mturksurveyspring2016), 400),]
+
+```
+
+## Executive Summary
+
+Terrorism is one of the major issues that is defining the 2016 presidential election. I examine what mechanical turks see as an appropriate response to terrorism by asking them if they support or oppose Mr. Trump's suggestion that the United States kill the families of terrorists. This question was asked as part of a larger survey administered through the Amazon Mechanical Turk website. A sample of 400 out of the 900 responses was taken from the survey for the analysis. It turns out the vast majority, over 70%, of turks oppose Mr. Trump's policy. There are, however, statistically significant differences in the extent to which conservatives and liberals support this policy. Conservatives support is more than 3 times that of liberals, although the majority of conservatives still oppose it.
+
+The full results of the survey follow below, along with the analysis of how ideology affects responses to terrorism.
+
+### Survey Results Overview
+
+**Table 1. What is your gender?**
+```{r gender, results='asis', warning=FALSE, message=FALSE, echo=FALSE}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+samp <- mysurveysamp %>% group_by(X2.Gender) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X2.Gender) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+
+```
+
+
+**Table 2. What is your Age? (in years)**
+```{r age, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+samp <- mysurveysamp %>% summarise(Sample.Mean = round(mean(X3.Age, na.rm = TRUE),1), Sample.SD = round(sd(X3.Age, na.rm = TRUE),1)) 
+
+pop <- mturksurveyspring2016 %>% summarise(Pop.Mean = round(mean(X3.Age, na.rm = TRUE),1), Pop.SD = round(sd(X3.Age, na.rm = TRUE),1)) 
+
+both <- cbind(pop,samp)
+
+colnames(both) <- c("Pop. Mean","Pop. Std Deviation","Sample Mean","Sample Std Deviation")
+
+kable(both)
+```
+
+**Table 3. What racial/ethnic group, if any, do you belong?**
+```{r race, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn dual category responses to null ##
+mysurveysamp$X4.Race[mysurveysamp$X4.Race %in% c("Black|NA/Alaskan|Other","Other","White|Asian","White|Black|Asian|NA/Alaskan","White|NA/Alaskan","White|Asian|Pacific Islander","White|Black|Hispanic","White|Pacific Islander","Black|Hispanic","Hispanic |NA/Alaskan","White|Black","White|Hispanic")] <- "Mixed Race/Other"
+mturksurveyspring2016$X4.Race[mturksurveyspring2016$X4.Race %in% c("Black|NA/Alaskan|Other","Other","White|Asian","White|Black|Asian|NA/Alaskan","White|NA/Alaskan","White|Asian|Pacific Islander","White|Black|Hispanic","White|Pacific Islander","Black|Hispanic","Hispanic |NA/Alaskan","White|Black","White|Hispanic")] <- "Mixed Race/Other"
+
+samp <- mysurveysamp %>% group_by(X4.Race) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X4.Race) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- full_join(pop,samp)
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+
+
+**Table 4. Which of the following best describes your current employment situation:**
+```{r employment, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn dual category responses to null ##
+mysurveysamp$X5.FTPT[mysurveysamp$X5.FTPT %in% c("a|b","a|c","c|d","e|f","e|g")] <- "Null"
+mturksurveyspring2016$X5.FTPT[mturksurveyspring2016$X5.FTPT %in% c("a|b","a|c","c|d","e|f","e|g")] <- "Null"
+
+## turn into factor and label values ##
+
+mysurveysamp$X5.FTPT <- factor(mysurveysamp$X5.FTPT
+                               ,levels = c("a","b","c","d","e","f","g","Null")
+                               ,labels = c("Full time with potential for promotion"
+                                           ,"Full time with no potential for promotion"
+                                           ,"Part time with potential for Full Time employment or Promotion"
+                                           ,"Part time with no potential for Full Time employment or Promotion"
+                                           ,"Unemployed"
+                                           ,"Retired"
+                                           ,"Of working age, but unable to work"
+                                           ,"Null"))
+
+mturksurveyspring2016$X5.FTPT <- factor(mturksurveyspring2016$X5.FTPT
+                               ,levels = c("a","b","c","d","e","f","g","Null")
+                               ,labels = c("Full time with potential for promotion"
+                                           ,"Full time with no potential for promotion"
+                                           ,"Part time with potential for Full Time employment or Promotion"
+                                           ,"Part time with no potential for Full Time employment or Promotion"
+                                           ,"Unemployed"
+                                           ,"Retired"
+                                           ,"Of working age, but unable to work"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X5.FTPT) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X5.FTPT) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 5. What was your personal annual earned income this past year before taxes?**
+```{r income, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X6.Income <- factor(mysurveysamp$X6.Income
+                               ,levels = c("a","b","c","d","e","f","Null")
+                               ,labels = c("Less than $20,000"
+                                           ,"$20,000-$39,999"
+                                           ,"$40,000-$59,999"
+                                           ,"$60,000-$79,999"
+                                           ,"$80,000-$99,999"
+                                           ,"$100,000 or more"
+                                           ,"Null"))
+
+mturksurveyspring2016$X6.Income <- factor(mturksurveyspring2016$X6.Income
+                               ,levels = c("a","b","c","d","e","f","Null")
+                               ,labels = c("Less than $20,000"
+                                           ,"$20,000-$39,999"
+                                           ,"$40,000-$59,999"
+                                           ,"$60,000-$79,999"
+                                           ,"$80,000-$99,999"
+                                           ,"$100,000 or more"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X6.Income) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X6.Income) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+
+```
+
+**Table 6. We are interested in how people are getting along financially these days.  Would you say that you (and your family living here) are BETTER off or WORSE off financially than you were a year ago?**
+```{r BetterOrWorse, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X7.betterworse <- factor(mysurveysamp$X7.betterworse
+                               ,levels = c("a","b","Null")
+                               ,labels = c("Better Off"
+                                           ,"Worse Off"
+                                           ,"Null"))
+
+mturksurveyspring2016$X7.betterworse <- factor(mturksurveyspring2016$X7.betterworse
+                              ,levels = c("a","b","Null")
+                               ,labels = c("Better Off"
+                                           ,"Worse Off"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X7.betterworse) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X7.betterworse) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 7. What is your level of education?**
+```{r education, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X8.educ <- factor(mysurveysamp$X8.educ
+                               ,levels = c("a","b","c","d","e","Null")
+                               ,labels = c("Some High School"
+                                           ,"High School Diploma"
+                                           ,"Some College/AA"
+                                           ,"College Degree/BA/BS"
+                                           ,"Graduate Degree"
+                                           ,"Null"))
+
+mturksurveyspring2016$X8.educ <- factor(mturksurveyspring2016$X8.educ
+                              ,levels = c("a","b","c","d","e","Null")
+                               ,labels = c("Some High School"
+                                           ,"High School Diploma"
+                                           ,"Some College/AA"
+                                           ,"College Degree/BA/BS"
+                                           ,"Graduate Degree"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X8.educ) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X8.educ) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 8. Are you currently registered to vote?**
+```{r reg, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X9.Reg <- factor(mysurveysamp$X9.Reg
+                               ,levels = c("a","b","Null")
+                               ,labels = c("Yes"
+                                           ,"No"
+                                           ,"Null"))
+
+mturksurveyspring2016$X9.Reg <- factor(mturksurveyspring2016$X9.Reg
+                              ,levels = c("a","b","Null")
+                              ,labels = c("Yes"
+                                           ,"No"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X9.Reg) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X9.Reg) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 9. What political party, if any, are you a member of?**
+```{r party, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X10.Party <- factor(mysurveysamp$X10.Party
+                               ,levels = c("a","b","c","d","Null")
+                               ,labels = c("Democrat"
+                                           ,"Republican"
+                                           ,"Independent/no party"
+                                           ,"Other"
+                                           ,"Null"))
+
+mturksurveyspring2016$X10.Party <- factor(mturksurveyspring2016$X10.Party
+                              ,levels = c("a","b","c","d","Null")
+                              ,labels = c("Democrat"
+                                           ,"Republican"
+                                           ,"Independent/no party"
+                                           ,"Other"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X10.Party) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X10.Party) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 10. When it comes to politics do you usually think of yourself as:**
+```{r ideology, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X11.IDEOL <- factor(mysurveysamp$X11.IDEOL
+                               ,levels = c("a","b","c","d","e","f","g","Null")
+                               ,labels = c("extremely liberal"
+                                           ,"liberal"
+                                           ,"slightly liberal"
+                                           ,"moderate"
+                                           ,"slightly conservative"
+                                           ,"conservative"
+                                           ,"extremely conservative"
+                                           ,"Null"))
+
+mturksurveyspring2016$X11.IDEOL <- factor(mturksurveyspring2016$X11.IDEOL
+                              ,levels = c("a","b","c","d","e","f","g","Null")
+                              ,labels = c("extremely liberal"
+                                           ,"liberal"
+                                           ,"slightly liberal"
+                                           ,"moderate"
+                                           ,"slightly conservative"
+                                           ,"conservative"
+                                           ,"extremely conservative"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X11.IDEOL) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X11.IDEOL) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 11. Some people don't pay much attention to the political campaigns. How about you, would you say that you have been/were very much interested, somewhat interested, or not much interested in following the political campaigns (so far) this year?**
+```{r interest, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X12.Interest <- factor(mysurveysamp$X12.Interest
+                               ,levels = c("a","b","c","d","Null")
+                               ,labels = c("Very Much Interested"
+                                           ,"Somewhat Interested"
+                                           ,"Not Much Interested"
+                                           ,"Not At All Interested"
+                                           ,"Null"))
+
+mturksurveyspring2016$X12.Interest <- factor(mturksurveyspring2016$X12.Interest
+                              ,levels = c("a","b","c","d","Null")
+                              ,labels = c("Very Much Interested"
+                                           ,"Somewhat Interested"
+                                           ,"Not Much Interested"
+                                           ,"Not At All Interested"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X12.Interest) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X12.Interest) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 12. Did you vote in your state’s primary or caucus convention during the 2016 Presidential Primary or Caucus Election?**
+```{r primary, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X13.Primary <- factor(mysurveysamp$X13.Primary
+                               ,levels = c("a","b","c","d","e","f","Null")
+                               ,labels = c("Yes, I voted"
+                                           ,"My state has not had its election, yet, but I plan to vote"
+                                           ,"My state has not had its election, yet, and I do not plan to vote"
+                                           ,"No, I did not vote due to other circumstances"
+                                           ,"No, I did not vote due to disinterest"
+                                           ,"I am unsure of when my election is"
+                                           ,"Null"))
+
+mturksurveyspring2016$X13.Primary <- factor(mturksurveyspring2016$X13.Primary
+                              ,levels = c("a","b","c","d","e","f","Null")
+                               ,labels = c("Yes, I voted"
+                                           ,"My state has not had its election, yet, but I plan to vote"
+                                           ,"My state has not had its election, yet, and I do not plan to vote"
+                                           ,"No, I did not vote due to other circumstances"
+                                           ,"No, I did not vote due to disinterest"
+                                           ,"I am unsure of when my election is"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X13.Primary) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X13.Primary) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 13. Now, consider sources of influence over how you will vote in this election that are outside of your circle of family or friends. Of the following, which would you consider has had the most influence over how you will vote in this coming election?**
+```{r influence, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X14.Influence <- factor(mysurveysamp$X14.Influence
+                               ,levels = c("a","b","c","d","e","f","g","h","Null")
+                               ,labels = c("Workers Union"
+                                           ,"Local Religious Figure"
+                                           ,"Local Media"
+                                           ,"Bloggers That Focus Specifically on Your State, County, Town, or City"
+                                           ,"National Media"
+                                           ,"Teacher"
+                                           ,"Other"
+                                           ,"Not Influenced by Any Other Source"
+                                           ,"Null"))
+
+mturksurveyspring2016$X14.Influence <- factor(mturksurveyspring2016$X14.Influence
+                              ,levels = c("a","b","c","d","e","f","g","h","Null")
+                              ,labels = c("Workers Union"
+                                           ,"Local Religious Figure"
+                                           ,"Local Media"
+                                           ,"Bloggers That Focus Specifically on Your State, County, Town, or City"
+                                           ,"National Media"
+                                           ,"Teacher"
+                                           ,"Other"
+                                           ,"Not Influenced by Any Other Source"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X14.Influence) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X14.Influence) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 14. In choosing a presidential candidate to win your party’s nomination in the primary election, is it more important to you that the candidate you vote for best represents your positions on the issues, or is it more important that the candidate can go on to win the general election in November?**
+```{r PresCand, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X15.PresCand <- factor(mysurveysamp$X15.PresCand
+                               ,levels = c("a","b","c","d","e","Null")
+                               ,labels = c("Best represents positions on the issues"
+                                           ,"Can win the general election in November"
+                                           ,"Both equally"
+                                           ,"Neither"
+                                           ,"Not sure/ Don’t Know"
+                                           ,"Null"))
+
+mturksurveyspring2016$X15.PresCand <- factor(mturksurveyspring2016$X15.PresCand
+                              ,levels = c("a","b","c","d","e","Null")
+                              ,labels = c("Best represents positions on the issues"
+                                           ,"Can win the general election in November"
+                                           ,"Both equally"
+                                           ,"Neither"
+                                           ,"Not sure/ Don’t Know"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X15.PresCand) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X15.PresCand) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+
+```
+
+**Table 15. Do YOU support the activist group “Black Lives Matter” to reduce racial inequality in America?**
+```{r BLM, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X16.BLM <- factor(mysurveysamp$X16.BLM
+                               ,levels = c("a","b","c","d","e","f","Null")
+                               ,labels = c("Strongly Support"
+                                           ,"Support"
+                                           ,"Neither Support/nor Oppose"
+                                           ,"Oppose"
+                                           ,"Strongly Oppose"
+                                           ,"Not Sure/Don’t Know "
+                                           ,"Null"))
+
+mturksurveyspring2016$X16.BLM <- factor(mturksurveyspring2016$X16.BLM
+                              ,levels = c("a","b","c","d","e","f","Null")
+                              ,labels = c("Strongly Support"
+                                           ,"Support"
+                                           ,"Neither Support/nor Oppose"
+                                           ,"Oppose"
+                                           ,"Strongly Oppose"
+                                           ,"Not Sure/Don’t Know "
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X16.BLM) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X16.BLM) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+
+```
+
+**Table 16. Do you, as an individual, have a responsibility to protect the human rights of others, regardless of their citizenship or birth country?**
+```{r HumRights, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X17.HumRig <- factor(mysurveysamp$X17.HumRig
+                               ,levels = c("a","b","c","d","e","Null")
+                               ,labels = c("Strongly Disagree"
+                                           ,"Disagree"
+                                           ,"Uncertain"
+                                           ,"Agree"
+                                           ,"Strongly agree"
+                                           ,"Null"))
+
+mturksurveyspring2016$X17.HumRig <- factor(mturksurveyspring2016$X17.HumRig
+                              ,levels = c("a","b","c","d","e","Null")
+                               ,labels = c("Strongly Disagree"
+                                           ,"Disagree"
+                                           ,"Uncertain"
+                                           ,"Agree"
+                                           ,"Strongly agree"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X17.HumRig) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X17.HumRig) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 17. “Targeted Regulation of Abortion Provider (TRAP) laws” have been used by various states for regulation and control of abortion clinics. These laws deal with various aspects of abortion clinics such as location limits, waiting times to get an abortion, operational requirements of construction, staffing, admitting privileges, type of surgical procedures that can be carried out etc.   It is believed that TRAP laws can reduce the incidence of abortion in United States?  What is your nature of agreement with this statement?**
+```{r Abortion, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X18.TRAP <- factor(mysurveysamp$X18.TRAP
+                               ,levels = c("a","b","c","d","e","f","Null")
+                               ,labels = c("Strongly Disagree"
+                                           ,"Somewhat Disagree"
+                                           ,"Somewhat Agree"
+                                           ,"Strongly Agree"
+                                           ,"Somewhat Disagree, but they are discriminatory in nature"
+                                           ,"Somewhat Agree, but they are discriminatory in nature"
+                                           ,"Null"))
+
+mturksurveyspring2016$X18.TRAP <- factor(mturksurveyspring2016$X18.TRAP
+                              ,levels = c("a","b","c","d","e","f","Null")
+                              ,labels = c("Strongly Disagree"
+                                           ,"Somewhat Disagree"
+                                           ,"Somewhat Agree"
+                                           ,"Strongly Agree"
+                                           ,"Somewhat Disagree, but they are discriminatory in nature"
+                                           ,"Somewhat Agree, but they are discriminatory in nature"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X18.TRAP) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X18.TRAP) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 18. Do you believe that the FDA should require that GMO foods be specifically labeled?**
+```{r FDA, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X19.GMO <- factor(mysurveysamp$X19.GMO
+                               ,levels = c("a","b","c","Null")
+                               ,labels = c("Yes"
+                                           ,"No"
+                                           ,"Not Sure/Don’t Know"
+                                           ,"Null"))
+
+mturksurveyspring2016$X19.GMO <- factor(mturksurveyspring2016$X19.GMO
+                              ,levels = c("a","b","c","Null")
+                              ,labels = c("Yes"
+                                           ,"No"
+                                           ,"Not Sure/Don’t Know"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X19.GMO) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X19.GMO) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 19. Do you think that employers should be required to provide paid family leave to their employees?**
+```{r FamLeave, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X20.PDFMLV <- factor(mysurveysamp$X20.PDFMLV
+                               ,levels = c("a","b","c","Null")
+                               ,labels = c("Yes"
+                                           ,"No"
+                                           ,"Not Sure/Don’t Know"
+                                           ,"Null"))
+
+mturksurveyspring2016$X20.PDFMLV <- factor(mturksurveyspring2016$X20.PDFMLV
+                              ,levels = c("a","b","c","Null")
+                               ,labels = c("Yes"
+                                           ,"No"
+                                           ,"Not Sure/Don’t Know"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X20.PDFMLV) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X20.PDFMLV) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+
+```
+
+**Table 20. What effect, if any, do you believe illegal immigration has on the U.S. economy?**
+```{r immigration, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X21.ImmEcon <- factor(mysurveysamp$X21.ImmEcon
+                               ,levels = c("a","b","c","d","e","f","Null")
+                               ,labels = c("I strongly believe illegal immigration has a negative effect on the economy"
+                                           ,"I believe illegal immigration has a negative effect on the economy"
+                                           ,"I believe illegal immigration has neither a negative or positive effect on the economy"
+                                           ,"I believe illegal immigration has a positive effect on the economy"
+                                           ,"I strongly illegal immigration has a positive effect on the economy"
+                                           ,"Not Sure/Don’t Know"
+                                           ,"Null"))
+
+mturksurveyspring2016$X21.ImmEcon <- factor(mturksurveyspring2016$X21.ImmEcon
+                               ,levels = c("a","b","c","d","e","f","Null")
+                               ,labels = c("I strongly believe illegal immigration has a negative effect on the economy"
+                                           ,"I believe illegal immigration has a negative effect on the economy"
+                                           ,"I believe illegal immigration has neither a negative or positive effect on the economy"
+                                           ,"I believe illegal immigration has a positive effect on the economy"
+                                           ,"I strongly illegal immigration has a positive effect on the economy"
+                                           ,"Not Sure/Don’t Know"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X21.ImmEcon) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X21.ImmEcon) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 21. There are roughly 11.3 million illegal immigrants in the U.S. Should they be granted legal status, and therefore be allowed to stay, or should they be deported?**
+```{r deportation, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X22.LegalImm <- factor(mysurveysamp$X22.LegalImm
+                               ,levels = c("a","b","c","d","e","Null")
+                               ,labels = c("Yes, make everyone legal"
+                                           ,"Yes, but only grant legal status to those that meet certain requirements"
+                                           ,"No, do not grant legal status, but allow these individuals to stay"
+                                           ,"No, do not grant legal status, and efforts should be made to deport these individuals"
+                                           ,"Not sure/ Don’t Know"
+                                           ,"Null"))
+
+mturksurveyspring2016$X22.LegalImm <- factor(mturksurveyspring2016$X22.LegalImm
+                               ,levels = c("a","b","c","d","e","Null")
+                               ,labels = c("Yes, make everyone legal"
+                                           ,"Yes, but only grant legal status to those that meet certain requirements"
+                                           ,"No, do not grant legal status, but allow these individuals to stay"
+                                           ,"No, do not grant legal status, and efforts should be made to deport these individuals"
+                                           ,"Not sure/ Don’t Know"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X22.LegalImm) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X22.LegalImm) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 22. I’d like to hear your thoughts on the United Nations, based on what you know or have read. Do you agree or disagree that the United Nations is an effective organization in dealing with armed conﬂict across the globe?**
+```{r UN, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X23.UN <- factor(mysurveysamp$X23.UN
+                               ,levels = c("a","b","c","d","e","f","g","h","Null")
+                               ,labels = c("Strongly Disagree"
+                                           ,"Disagree"
+                                           ,"Somewhat Disagree"
+                                           ,"Neither Disagree/Nor Agree"
+                                           ,"Somewhat Agree"
+                                           ,"Agree"
+                                           ,"Strongly Agree"
+                                           ,"Don’t Know/No opinion"
+                                           ,"Null"))
+
+mturksurveyspring2016$X23.UN <- factor(mturksurveyspring2016$X23.UN
+                              ,levels = c("a","b","c","d","e","f","g","h","Null")
+                               ,labels = c("Strongly Disagree"
+                                           ,"Disagree"
+                                           ,"Somewhat Disagree"
+                                           ,"Neither Disagree/Nor Agree"
+                                           ,"Somewhat Agree"
+                                           ,"Agree"
+                                           ,"Strongly Agree"
+                                           ,"Don’t Know/No opinion"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X23.UN) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X23.UN) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+
+```
+
+**Table 23. Tell me whether or not you agree with the following statement “In the case where there is a national security threat, for example the World Trade Center Bombing, the government should have access to people’s cellular phone records.”**
+```{r cellrecords, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X24.CellRecords <- factor(mysurveysamp$X24.CellRecords
+                               ,levels = c("a","b","c","d","e","f","Null")
+                               ,labels = c("Strongly Agree"
+                                           ,"Agree"
+                                           ,"Neither agree nor disagree"
+                                           ,"Disagree"
+                                           ,"Strongly disagree"
+                                           ,"Don’t Know/Not Sure"
+                                           ,"Null"))
+
+mturksurveyspring2016$X24.CellRecords <- factor(mturksurveyspring2016$X24.CellRecords
+                              ,levels = c("a","b","c","d","e","f","Null")
+                              ,labels = c("Strongly Agree"
+                                           ,"Agree"
+                                           ,"Neither agree nor disagree"
+                                           ,"Disagree"
+                                           ,"Strongly disagree"
+                                           ,"Don’t Know/Not Sure"
+                                           ,"Null"))
+
+
+samp <- mysurveysamp %>% group_by(X24.CellRecords) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X24.CellRecords) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 24. Personal electronic device companies are increasingly using software encryption that prevents anyone other than the device owner from accessing the contents of the device, including devices owned by suspected terrorists. Do you support encryption that prevents law enforcement operating under a court order from accessing information on personal electronic devices, such as a cell phone, that could potentially aid in a terrorism investigation?**
+```{r ped, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X25.PED <- factor(mysurveysamp$X25.PED
+                               ,levels = c("a","b","c","Null")
+                               ,labels = c("Yes"
+                                           ,"No"
+                                           ,"Not Sure/Don’t Know"
+                                           ,"Null"))
+
+mturksurveyspring2016$X25.PED <- factor(mturksurveyspring2016$X25.PED
+                              ,levels = c("a","b","c","Null")
+                               ,labels = c("Yes"
+                                           ,"No"
+                                           ,"Not Sure/Don’t Know"
+                                           ,"Null"))
+
+samp <- mysurveysamp %>% group_by(X25.PED) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X25.PED) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+```
+
+**Table 25. With the recent terrorist attacks in Europe some have called for using tougher means to deter terrorists. To what extent would you support the United States killing the family members of terrorists in order to punish and deter future attacks?**
+```{r terfam, results='asis'}
+library(knitr)
+library(dplyr)
+library(reshape2)
+
+## turn into factor and label values ##
+
+mysurveysamp$X26.TerFam <- factor(mysurveysamp$X26.TerFam
+                               ,levels = c("a","b","c","d","e","Null")
+                               ,labels = c("Strongly support"
+                                           ,"Support"
+                                           ,"Oppose"
+                                           ,"Strongly oppose"
+                                           ,"No opinion"
+                                           ,"Null"))
+
+mturksurveyspring2016$X26.TerFam <- factor(mturksurveyspring2016$X26.TerFam
+                              ,levels = c("a","b","c","d","e","Null")
+                              ,labels = c("Strongly support"
+                                           ,"Support"
+                                           ,"Oppose"
+                                           ,"Strongly oppose"
+                                           ,"No opinion"
+                                           ,"Null"))
+
+
+samp <- mysurveysamp %>% group_by(X26.TerFam) %>% summarise(Sample.N = n()) %>% mutate(Sample.Percent = round(prop.table(Sample.N)*100,1))
+
+pop <- mturksurveyspring2016 %>% group_by(X26.TerFam) %>% summarise(Pop.N = n()) %>% mutate(Pop.Percent = round(prop.table(Pop.N)*100,1))
+
+both <- cbind(pop,samp[,2:3])
+
+colnames(both) <- c("Response","Pop. N","Pop. Percent","Sample N","Sample Percent")
+
+kable(both)
+
+```
+
+## Topic and Research Questions
+
+With this survey and paper I examine responses to terrorism. Specifically what people see as appropriate
+responses to terrorism. The ongoing battle against the Islamic State (ISIS) and the recent eruption of terrorist violence in Europe has increased interest in the United States' policy response to terrorism. This increased interest has in turn effected the U.S. presidential election^[http://www.nbcnews.com/meet-the-press/nbc-wsj-poll-terror-fears-reshape-2016-landscape-n479831] by prompting candidates to declare how they would combat terrorism. Mr. Trump and Mr.
+Cruz have made particularly provocative policy declarations; to kill the families of terrorists in the latter’s case, and carpet bomb ISIS in the former’s. Both candidates were roundly criticized by foreign policy experts from across the ideological spectrum and walked back, or at least publicly tempered, their comments. So although there is little support for these policies in foreign policy circles, I was able to find little polling to assess to what extent these extreme positions are supported or rejected by the public at large. The closest is polling done to see to what extent the public supports the use of torture^[http://www.pewresearch.org/fact-tank/2014/12/09/americans-views-on-use-of-torture-in-fighting-terrorism-have-been-mixed/], but the use of torture to extract information from a suspected terrorist is different than using violence against civilians as a punative or preventive measure and public support between the two may vary considerably.
+
+In addition to examining support for these extreme responses to terrorism I also seek to examine how they are effected by ideology. Is there a correlation between ideology and support for these measures? In many surveys of views on torture the relationship between political party and support of torture is examined but rarely ideology.
+
+## Key Concepts and Variables
+
+The key concept is support or opposition to using violence against civilians as a punative and/or preventative measure against terrorism. In order to examine this I constructed the following question:
+
+> With the recent terrorist attacks in Europe some have called for using tougher means to deter terrorist activity. To what extent would you support the United States killing the family members of terrorists in order to punish and deter future attacks?
+> 
+> Strongly Support
+> Somewhat Support
+> Somewhat Oppose
+> Strongly Oppose
+> No Opinion
+
+The question is worded simply and the policy stated starkly in order to increase the reliability and decrease error due to misunderstanding. By asking about a specific policy we also increase validity by asking respondents to evaluate something that will have a real impact in the world as opposed to broad concepts like "toughness" where each respondent can interpret what that means differently. Although the specific policy referenced in the question originated from Mr. Trump any mention of political candidates was left out so as not to bias the response by connecting the question to a respondents feelings toward a specific candidate. The responses are a 4-part likert scale with a "No Opinion" option at the end. The question was worded in terms of support of increased use of violence and the support options given first in order to push against any social desirability bias that respondents might feel.
+
+## Hypothesis and Theoretical Rational
+
+Hypothesis: In a comparison of mechanical turks, those having a more conservative ideology will be more likely to support killing terrorist family members than will those having a more liberal ideology.
+
+Conservative voters tend to be more hawkish when it comes to the use of military force and torture against terrorists^[http://www.reuters.com/article/us-usa-election-torture-exclusive-idUSKCN0WW0Y3]. This willingness to use force likely also extends to using force in more unconventional ways if it is in the service of preventing terrorists attacks. In addition, killing terrorist family members has been proposed by the presumptive Republican presidential candidate and the Republican party tends to be more conservative than the population. Thus some may support the policy out as a way to signal solidarity with their party, althoug I have tried to mitigate this by excluding references to parties or candidates. On the other hand, Mr. Trump may be appealing to those in his party that are not as attached to the conservative ideology, especially religious conservatives which may have more negative views of this policy.
+
+H0: Conservatives and liberals are equally likely to support killing the family members of terrorists.
+
+HA: Conservatives are more likely than liberals to support killing the family members of terrorists.
+
+To test this hypothesis I will use cross-tabulation analysis and apply the chi-square test of significance. If the p-value is .05 or less we can reject the null hypothesis.
+
+## Methods and Data Sources
+
+The survey data was collected by a survey administered through Amazon's Mechanical Turk website. This website allows people to do simple jobs (e.g. categorize a receipt; translate a paragraph from English to French) over the internet for small sums of money. Each turk was paid $0.25 to complete the survey. A total of 900 responses were collected. 
+
+The analysis of the survey was done with the R programming language in the RStudio IDE. The *sample* function from base R was used to pull a 400 N simple random sample without replacement from the population. Our seed was set to 543.  
+
+## Findings
+
+As can be seen from figure 1. the overwhelming majority turks in our sample strongly oppose killing the family members of terrorists. More turks strongly oppose than all other categories combined. In addition, more turks just oppose than either support or strongly support. If we combine the percentages found in table 25. of strong supporters with the supporters, and the strong opposers with the opposers, we find that 17.3% generally support and 77.8% generally oppose. This differs significantly from surveys of the general population on support for torture of terrorist suspects which frequently find close to 50% or greater support for torture.
+
+Figure 1. To what extent would you support the United States killing the family members of terrorists in order to punish and deter future attacks?
+```{r terfamplot, results='asis'}
+library(ggplot2)
+
+ggplot(mysurveysamp, aes(X26.TerFam)) +
+      geom_bar() +
+      xlab("Response")+
+      ylab("Number of Respondents") +
+      theme_bw() +
+      theme(axis.text.x = element_text(size = rel(.7)))
+ 
+```
+
+In figure 2. we can see that the turks skew heavily liberal. Table 10. gives a full breakdown of each category but if we combine all the liberals together and all the conservatives we find that 57.2% are liberal, 24.7% are conservative, and 17% moderate. 
+
+Figure 2. When it comes to politics do you usually think of yourself as:
+```{r ideoplot, results='asis'}
+library(ggplot2)
+
+addline_format <- function(x,...){
+    gsub('\\s','\n',x)
+}
+
+ggplot(mysurveysamp, aes(X11.IDEOL)) +
+      geom_bar() +
+      xlab("Response")+
+      ylab("Number of Respondents") +
+      theme_bw() +
+      scale_x_discrete(labels = addline_format(c("extremely liberal" 
+                                           ,"liberal"
+                                           ,"slightly liberal" 
+                                           ,"moderate"
+                                           ,"slightly conservative"
+                                           ,"conservative"
+                                           ,"extremely conservative"
+                                           ,"Null"))) +
+      theme(axis.text.x = element_text(size = rel(.7)))
+
+```
+
+As can be seen in table 25. the counts for both support responses are low with a total of 69. When spread across 7 different ideology categories the counts are even lower per bucket. In order to ensure a more robust analysis I combined the support and oppose categories, as well as the liberal and conservative categories. This gives us three responses for our question on terrorism (Support, Oppose, No opinion) and three responses for ideology (Liberal, Moderate, Conservative). 
+
+As can be seen in table 26. 10.8% of liberals support killing the families of terrorists whereas 37.6% of conservatives support it. This supports the hypothesis that conservatives are more likely to support killing the families of terrorists than conservatives. When we run a chi-square test we get a chi-square value of 39.64 and a p-value of 5.138e-08 which meets our stated .05 threshold for rejecting the null hypothesis. 
+
+```{r crosstab, eval=FALSE}
+library(plyr)
+
+terfam <-revalue(mysurveysamp$X26.TerFam, c("Strongly support" = "Support"
+                                           ,"Strongly oppose" = "Oppose"))
+
+ideology <- revalue(mysurveysamp$X11.IDEOL, c("extremely liberal" = "liberal"
+                                           ,"slightly liberal" = "liberal"
+                                           ,"slightly conservative" = "conservative"
+                                           ,"extremely conservative" = "conservative"
+                                    ))
+
+## revalue nulls
+is.na(terfam) <- terfam == "Null"
+is.na(ideology) <- ideology == "Null"
+
+## clean out "Null" level
+terfam <- droplevels(terfam)
+ideology <- droplevels(ideology)
+
+## run crosstab and chi sq test
+terXide <- table(terfam,ideology)
+summary(terXide)
+
+## create pcnt
+
+terXide = cbind(terXide, Sum = margin.table(terXide,1))
+pcntdf = round((prop.table(terXide,2))*100,1)
+
+## Combine pcnt and raw 
+
+pcntdf <- as.data.frame(pcntdf)
+terXide <- as.data.frame(terXide)
+cbind(terXide,pcntdf)
+
+```
+
+
+## Discussion
+
+Terrorism continues to be one of the major issues in the 2016 presidential election. Our results confirm our hypothesis that conservatives are more likely to support killing the family members of terrorists, although it should be noted that a majority of conservatives still oppose this policy. This is consistent with the results of polling that show that Republicans are more likely to favor the use of torture and military intervention, as long as we assume that Republicans tend to be more conservative. This raises a possible area of further research. Do these results reflect the effect of conservative ideology or are they driven by partisan solidarity? To test this we could do the same comparison but control for political party. 
